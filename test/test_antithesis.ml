@@ -1,6 +1,5 @@
 (** Unit tests for the [Hegel.Antithesis] integration module (doc-hidden). *)
 
-open! Core
 module A = Hegel.Antithesis
 
 let env_var = "ANTITHESIS_OUTPUT_DIR"
@@ -8,26 +7,26 @@ let env_var = "ANTITHESIS_OUTPUT_DIR"
 (** Run [f] with [ANTITHESIS_OUTPUT_DIR] set to [dir]; restore the previous
     value on exit. *)
 let with_env_dir dir ~f =
-  let prev = Sys.getenv env_var in
-  Core_unix.putenv ~key:env_var ~data:dir;
-  Exn.protect
+  let prev = Stdlib.Sys.getenv_opt env_var in
+  Unix.putenv env_var dir;
+  Stdlib.Fun.protect
     ~finally:(fun () ->
       match prev with
-      | Some v -> Core_unix.putenv ~key:env_var ~data:v
+      | Some v -> Unix.putenv env_var v
       | None -> Test_helpers.unsetenv env_var)
-    ~f
+    f
 ;;
 
 (** Run [f] with [ANTITHESIS_OUTPUT_DIR] guaranteed unset. *)
 let with_env_unset ~f =
-  let prev = Sys.getenv env_var in
+  let prev = Stdlib.Sys.getenv_opt env_var in
   Test_helpers.unsetenv env_var;
-  Exn.protect
+  Stdlib.Fun.protect
     ~finally:(fun () ->
       match prev with
-      | Some v -> Core_unix.putenv ~key:env_var ~data:v
+      | Some v -> Unix.putenv env_var v
       | None -> Test_helpers.unsetenv env_var)
-    ~f
+    f
 ;;
 
 let with_tempdir ~f = Test_helpers.with_tempdir ~prefix:"hegel-antithesis-test-" ~f
@@ -119,7 +118,7 @@ let test_write_jsonl_line_appends () =
     let path = Filename.concat dir "out.jsonl" in
     A.write_jsonl_line path (`Assoc [ "x", `Int 1 ]);
     A.write_jsonl_line path (`Assoc [ "y", `Int 2 ]);
-    let contents = In_channel.read_all path in
+    let contents = Test_helpers.read_all path in
     Alcotest.(check string) "two appended lines" "{\"x\":1}\n{\"y\":2}\n" contents)
 ;;
 
@@ -128,11 +127,11 @@ let test_emit_assertion_round_trips () =
     with_env_dir dir ~f:(fun () ->
       A.emit_assertion sample_location ~passed:true;
       let lines =
-        In_channel.read_all (Filename.concat dir "sdk.jsonl") |> String.split_lines
+        Test_helpers.read_all (Filename.concat dir "sdk.jsonl") |> Test_helpers.split_lines
       in
       Alcotest.(check int) "exactly two lines" 2 (List.length lines);
-      let decl = Yojson.Safe.from_string (List.nth_exn lines 0) in
-      let eval = Yojson.Safe.from_string (List.nth_exn lines 1) in
+      let decl = Yojson.Safe.from_string (List.nth lines 0) in
+      let eval = Yojson.Safe.from_string (List.nth lines 1) in
       let expected_decl = A.assertion_json sample_location ~hit:false ~condition:false in
       let expected_eval = A.assertion_json sample_location ~hit:true ~condition:true in
       Alcotest.(check string)
@@ -150,9 +149,9 @@ let test_emit_assertion_failed () =
     with_env_dir dir ~f:(fun () ->
       A.emit_assertion sample_location ~passed:false;
       let lines =
-        In_channel.read_all (Filename.concat dir "sdk.jsonl") |> String.split_lines
+        Test_helpers.read_all (Filename.concat dir "sdk.jsonl") |> Test_helpers.split_lines
       in
-      let eval = Yojson.Safe.from_string (List.nth_exn lines 1) in
+      let eval = Yojson.Safe.from_string (List.nth lines 1) in
       let expected_eval = A.assertion_json sample_location ~hit:true ~condition:false in
       Alcotest.(check string)
         "evaluation has condition:false"

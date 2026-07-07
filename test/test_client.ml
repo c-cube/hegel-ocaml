@@ -1,6 +1,4 @@
-open! Core
 open Hegel
-module Unix = Core_unix
 
 (* ==== Pure configuration tests ==== *)
 
@@ -19,15 +17,17 @@ let all_ci_vars =
 ;;
 
 let with_ci_vars_cleared f =
-  let saved = List.map all_ci_vars ~f:(fun v -> v, Sys.getenv v) in
-  List.iter all_ci_vars ~f:Test_helpers.unsetenv;
-  Exn.protect
+  let saved = List.map (fun v -> v, Stdlib.Sys.getenv_opt v) all_ci_vars in
+  List.iter Test_helpers.unsetenv all_ci_vars;
+  Stdlib.Fun.protect
     ~finally:(fun () ->
-      List.iter saved ~f:(fun (k, v) ->
-        match v with
-        | Some v -> Unix.putenv ~key:k ~data:v
-        | None -> Test_helpers.unsetenv k))
-    ~f
+      List.iter
+        (fun (k, v) ->
+          match v with
+          | Some v -> Unix.putenv k v
+          | None -> Test_helpers.unsetenv k)
+        saved)
+    f
 ;;
 
 let test_is_in_ci_false () =
@@ -37,19 +37,19 @@ let test_is_in_ci_false () =
 
 let test_is_in_ci_true_any () =
   with_ci_vars_cleared (fun () ->
-    Unix.putenv ~key:"CODEBUILD_BUILD_ID" ~data:"anything";
+    Unix.putenv "CODEBUILD_BUILD_ID" "anything";
     Alcotest.(check bool) "in ci (any value)" true (Internal.is_in_ci ()))
 ;;
 
 let test_is_in_ci_true_expected () =
   with_ci_vars_cleared (fun () ->
-    Unix.putenv ~key:"GITHUB_ACTIONS" ~data:"true";
+    Unix.putenv "GITHUB_ACTIONS" "true";
     Alcotest.(check bool) "in ci (expected value)" true (Internal.is_in_ci ()))
 ;;
 
 let test_is_in_ci_false_wrong_value () =
   with_ci_vars_cleared (fun () ->
-    Unix.putenv ~key:"GITHUB_ACTIONS" ~data:"false";
+    Unix.putenv "GITHUB_ACTIONS" "false";
     Alcotest.(check bool) "not in ci (wrong value)" false (Internal.is_in_ci ()))
 ;;
 
@@ -57,15 +57,15 @@ let test_default_settings_not_ci () =
   with_ci_vars_cleared (fun () ->
     let s = default_settings () in
     Alcotest.(check bool) "derandomize off" false s.derandomize;
-    Alcotest.(check bool) "database unset" true (Poly.equal s.database Unset))
+    Alcotest.(check bool) "database unset" true (s.database = Unset))
 ;;
 
 let test_default_settings_ci () =
   with_ci_vars_cleared (fun () ->
-    Unix.putenv ~key:"CI" ~data:"1";
+    Unix.putenv "CI" "1";
     let s = default_settings () in
     Alcotest.(check bool) "derandomize on" true s.derandomize;
-    Alcotest.(check bool) "database disabled" true (Poly.equal s.database Disabled))
+    Alcotest.(check bool) "database disabled" true (s.database = Disabled))
 ;;
 
 let test_settings_seed () =
@@ -91,7 +91,7 @@ let test_with_builders () =
   Alcotest.(check int) "test_cases" 5 s.test_cases;
   Alcotest.(check (option int)) "seed" (Some 3) s.seed;
   Alcotest.(check bool) "derandomize" true s.derandomize;
-  Alcotest.(check bool) "mode" true (Poly.equal s.mode Single_test_case)
+  Alcotest.(check bool) "mode" true (s.mode = Single_test_case)
 ;;
 
 (* Regression test: [with_suppress_health_check] sets the suppressed list like
@@ -154,9 +154,9 @@ let test_extract_origin () =
 let test_extract_origin_no_backtrace () =
   let was = Stdlib.Printexc.backtrace_status () in
   Stdlib.Printexc.record_backtrace false;
-  Exn.protect
+  Stdlib.Fun.protect
     ~finally:(fun () -> Stdlib.Printexc.record_backtrace was)
-    ~f:(fun () ->
+    (fun () ->
       let origin =
         try failwith "boom" with
         | e -> Internal.extract_origin e
@@ -218,7 +218,7 @@ let test_run_failing_reraises () =
   in
   match raised with
   | Some Boom -> ()
-  | Some other -> Alcotest.failf "expected Boom, got %s" (Exn.to_string other)
+  | Some other -> Alcotest.failf "expected Boom, got %s" (Printexc.to_string other)
   | None -> Alcotest.fail "expected a failure"
 ;;
 
@@ -293,17 +293,19 @@ let test_run_with_full_settings () =
     [database_key], and the non-default verbosities. *)
 let test_run_all_settings_branches () =
   Test_helpers.with_tempdir ~prefix:"hegel-db" ~f:(fun dir ->
-    List.iter [ Quiet; Verbose; Debug ] ~f:(fun verbosity ->
-      let settings =
-        Hegel.settings ~test_cases:1 ~seed:1 ()
-        |> with_verbosity verbosity
-        |> with_database (Path dir)
-        |> with_phases [ Explicit; Reuse; Generate; Target; Shrink ]
-        |> with_suppress_health_check
-             [ Filter_too_much; Too_slow; Test_cases_too_large; Large_initial_test_case ]
-      in
-      run_hegel_test ~settings ~database_key:"key" (fun tc ->
-        ignore (Hegel.draw tc int_gen : int))))
+    List.iter
+      (fun verbosity ->
+        let settings =
+          Hegel.settings ~test_cases:1 ~seed:1 ()
+          |> with_verbosity verbosity
+          |> with_database (Path dir)
+          |> with_phases [ Explicit; Reuse; Generate; Target; Shrink ]
+          |> with_suppress_health_check
+               [ Filter_too_much; Too_slow; Test_cases_too_large; Large_initial_test_case ]
+        in
+        run_hegel_test ~settings ~database_key:"key" (fun tc ->
+          ignore (Hegel.draw tc int_gen : int)))
+      [ Quiet; Verbose; Debug ])
 ;;
 
 (** [Flaky_strategy] raised from the body is treated as an invalid case. *)
@@ -427,7 +429,7 @@ let test_run_flaky_on_replay () =
         (fun tc ->
            ignore (Hegel.draw tc int_gen : int);
            let i = !calls in
-           Int.incr calls;
+           incr calls;
            assert (i <> 0));
       None
     with

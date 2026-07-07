@@ -1,16 +1,15 @@
-open! Core
 open Generators_core
 
 (* [validate_size_bounds ~min_size ~max_size] rejects negative or crossed
    collection size bounds. *)
 let validate_size_bounds ~min_size ~max_size =
   if min_size < 0
-  then raise (Invalid_argument (sprintf "min_size=%d must be non-negative" min_size));
+  then raise (Invalid_argument (Printf.sprintf "min_size=%d must be non-negative" min_size));
   match max_size with
   | Some ms when ms < 0 ->
-    raise (Invalid_argument (sprintf "max_size=%d must be non-negative" ms))
+    raise (Invalid_argument (Printf.sprintf "max_size=%d must be non-negative" ms))
   | Some ms when min_size > ms ->
-    raise (Invalid_argument (sprintf "Cannot have max_size=%d < min_size=%d" ms min_size))
+    raise (Invalid_argument (Printf.sprintf "Cannot have max_size=%d < min_size=%d" ms min_size))
   | _ -> ()
 ;;
 
@@ -24,7 +23,7 @@ let draw_association_pairs keys values ~min_size ~max_size data =
     if collection_more coll data
     then (
       let k = do_draw (core_of keys) data in
-      if List.exists acc ~f:(fun (k', _) -> Poly.equal k' k)
+      if List.exists (fun (k', _) -> k' = k) acc
       then (
         collection_reject coll data;
         collect acc)
@@ -54,42 +53,12 @@ let assoc_lists
   let pk = printer keys
   and pv = printer values in
   let sexp_of kvs =
-    Sexp.List (List.map kvs ~f:(fun (k, v) -> Sexp.List [ pk k; pv v ]))
+    Sexp.List (List.map (fun (k, v) -> Sexp.List [ pk k; pv v ]) kvs)
   in
   let core =
     Composite
       { label = Labels.map
       ; generate_fn = draw_association_pairs keys values ~min_size ~max_size
-      }
-  in
-  Printable { core; sexp_of }
-;;
-
-(** [hash_tables keys values ?min_size ?max_size ()] creates a generator for
-    polymorphic hash tables over printable [keys] and [values].
-
-    The entries are generated exactly as {!assoc_lists} generates its
-    pairs — one at a time via the collection protocol, duplicate keys
-    rejected client-side — and loaded into a [Hashtbl.Poly.t]. *)
-let hash_tables
-      (keys : ('a, printable) generator)
-      (values : ('b, printable) generator)
-      ?(min_size = 0)
-      ?max_size
-      ()
-  : (('a, 'b) Hashtbl.t, printable) generator
-  =
-  validate_size_bounds ~min_size ~max_size;
-  let pk = printer keys
-  and pv = printer values in
-  let sexp_of table = Hashtbl.Poly.sexp_of_t pk pv table in
-  let core =
-    Composite
-      { label = Labels.map
-      ; generate_fn =
-          (fun data ->
-            Hashtbl.Poly.of_alist_exn
-              (draw_association_pairs keys values ~min_size ~max_size data))
       }
   in
   Printable { core; sexp_of }
@@ -110,16 +79,16 @@ let lists
   : ('a list, printable) generator
   =
   if min_size < 0
-  then raise (Invalid_argument (sprintf "min_size=%d must be non-negative" min_size));
+  then raise (Invalid_argument (Printf.sprintf "min_size=%d must be non-negative" min_size));
   (match max_size with
    | Some ms when ms < 0 ->
-     raise (Invalid_argument (sprintf "max_size=%d must be non-negative" ms))
+     raise (Invalid_argument (Printf.sprintf "max_size=%d must be non-negative" ms))
    | Some ms when min_size > ms ->
      raise
-       (Invalid_argument (sprintf "Cannot have max_size=%d < min_size=%d" ms min_size))
+       (Invalid_argument (Printf.sprintf "Cannot have max_size=%d < min_size=%d" ms min_size))
    | _ -> ());
   let elt = printer elements in
-  let sexp_of xs = Sexp.List (List.map xs ~f:elt) in
+  let sexp_of xs = Sexp.List (List.map elt xs) in
   let core =
     if not unique
     then CompositeList { elements = core_of elements; min_size; max_size }
@@ -137,7 +106,7 @@ let lists
                 if collection_more coll data
                 then (
                   let elem = do_draw (core_of elements) data in
-                  if List.mem acc elem ~equal:Poly.equal
+                  if List.mem elem acc
                   then (
                     collection_reject coll data;
                     collect acc)

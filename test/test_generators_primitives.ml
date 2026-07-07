@@ -14,9 +14,9 @@ let test_integers_in_range () =
 let test_integers_unbounded_e2e () =
   Hegel.run_hegel_test ~settings:(Hegel.settings ~test_cases:20 ()) (fun tc ->
     let v = Hegel.draw tc (integers ()) in
-    assert (v >= Core.Int.min_value && v <= Core.Int.max_value);
+    assert (v >= min_int && v <= max_int);
     let xs = Hegel.draw tc (lists (integers ()) ()) in
-    assert (List.for_all (fun n -> n >= Core.Int.min_value && n <= Core.Int.max_value) xs))
+    assert (List.for_all (fun n -> n >= min_int && n <= max_int) xs))
 ;;
 
 (* ==== Validation tests ==== *)

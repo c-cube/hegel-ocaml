@@ -1,4 +1,4 @@
-open Core
+module Int_set = Set.Make (Int)
 
 (* Stateful failure test: the [push] rule pushes an int in [0, 100] onto a
    stack; the [pop] rule fails when the popped value is >= 50. Should shrink to [push 50; pop]. *)
@@ -39,7 +39,7 @@ module Var_state = struct
   module S = Hegel.Stateful
 
   type t =
-    { live : Int.Set.t
+    { live : Int_set.t
     ; variables : int S.Pool.t
     }
 end
@@ -52,7 +52,7 @@ let var_alloc_rule =
     let id = !var_next_id in
     incr var_next_id;
     S.Pool.add state.Var_state.variables id;
-    { state with Var_state.live = Set.add state.Var_state.live id })
+    { state with Var_state.live = Int_set.add id state.Var_state.live })
 ;;
 
 let var_free_rule =
@@ -60,8 +60,8 @@ let var_free_rule =
   S.Rule.create ~name:"free" ~step:(fun tc state ->
     let var_gen = S.Pool.values_consumed state.Var_state.variables in
     let id = Hegel.draw_silent tc var_gen in
-    assert (Set.mem state.Var_state.live id);
-    { state with Var_state.live = Set.remove state.Var_state.live id })
+    assert (Int_set.mem id state.Var_state.live);
+    { state with Var_state.live = Int_set.remove id state.Var_state.live })
 ;;
 
 let var_use_rule =
@@ -69,7 +69,7 @@ let var_use_rule =
   S.Rule.create ~name:"use" ~step:(fun tc state ->
     let var_gen = S.Pool.values_consumed state.Var_state.variables in
     let id = Hegel.draw_silent tc var_gen in
-    assert (Set.mem state.Var_state.live id);
+    assert (Int_set.mem id state.Var_state.live);
     state)
 ;;
 
@@ -78,12 +78,13 @@ let stateful_variables_test () =
     let module S = Hegel.Stateful in
     var_next_id := 0;
     S.run
-      ~init:{ Var_state.live = Int.Set.empty; variables = S.Pool.create tc }
+      ~init:{ Var_state.live = Int_set.empty; variables = S.Pool.create tc }
       ~rules:[ var_alloc_rule; var_free_rule ]
       ~invariants:
         [ (fun state ->
             assert (
-              S.Pool.size state.Var_state.variables = Set.length state.Var_state.live))
+              S.Pool.size state.Var_state.variables
+              = Int_set.cardinal state.Var_state.live))
         ]
       tc)
 ;;
@@ -93,7 +94,7 @@ let stateful_variables_draw_test () =
     let module S = Hegel.Stateful in
     var_next_id := 0;
     S.run
-      ~init:{ Var_state.live = Int.Set.empty; variables = S.Pool.create tc }
+      ~init:{ Var_state.live = Int_set.empty; variables = S.Pool.create tc }
       ~rules:[ var_alloc_rule; var_use_rule ]
       tc)
 ;;
@@ -163,12 +164,12 @@ let test_stateful_bounded_steps () =
           S.run ~init:() ~rules:[ step_rule ] tc)
    with
    | e ->
-     raised_msg := Exn.to_string e;
+     raised_msg := Printexc.to_string e;
      Printf.printf "%s" !raised_msg);
   Alcotest.(check bool)
     "exception carries the original message"
     true
-    (String.is_substring !raised_msg ~substring:"reached 10 steps");
+    (Test_helpers.contains_substring !raised_msg "reached 10 steps");
   Alcotest.(check int) "ran exactly 10 steps" 10 !step_count
 ;;
 
@@ -194,7 +195,7 @@ let test_swarm_long_single_rule_run () =
       last_rule := Some i;
       if !current_run > !case_longest then case_longest := !current_run)
   in
-  let rules = List.init 11 ~f:make in
+  let rules = List.init 11 make in
   Hegel.run_hegel_test ~settings:(Hegel.settings ~test_cases:200 ~seed:0 ()) (fun tc ->
     (* Reset per test case so a run can't bleed across cases. *)
     last_rule := None;

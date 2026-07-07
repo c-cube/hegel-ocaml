@@ -147,11 +147,15 @@ let%expect_test "recording groups each failure's draws with its diagnostic" =
   Printf.printf "%s" (normalize [%expect.output]);
   [%expect
     {|
-    --- Failure: multi_fail_test (ppx/test/expect_tests/test_failure_blobs_record.ml:133) ---
-    Falsified after 1 test case (0 discarded):
+    Failure 1:
+    v = 60
+    Exception: Expect_tests.Test_failure_blobs_record.A
+    Failure blob: "AAEAAAAACgEAAAA8"
 
-    Failure 1 of 2:
-      v = 60
+    Failure 2:
+    v = 0
+    Exception: Expect_tests.Test_failure_blobs_record.B
+    Failure blob: "AAEAAAAACgEAAAAA"
 
     Exception: Expect_tests.Test_failure_blobs_record.A
     rerun with: [@@failure_blobs [ "AAEAAAAACgEAAAA8" ]]
@@ -179,11 +183,13 @@ let%expect_test "the multi-failure report omits blobs when print_blob is off" =
   Printf.printf "%s" (normalize [%expect.output]);
   [%expect
     {|
-    --- Failure ------------------------------------------------------------
-    Falsified after 1 test case (0 discarded):
+    Failure 1:
+    draw_1 = 60
+    Exception: Expect_tests.Test_failure_blobs_record.A
 
-    Failure 1 of 2:
-      draw_1 = 60
+    Failure 2:
+    draw_1 = 0
+    Exception: Expect_tests.Test_failure_blobs_record.B
 
     Exception: Expect_tests.Test_failure_blobs_record.A
 

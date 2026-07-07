@@ -28,7 +28,7 @@ let test_one_of_e2e () =
     let gen =
       one_of
         [ integers ~min_value:0 ~max_value:10 ()
-        ; with_printer Core.Int.sexp_of_t (just 99)
+        ; with_printer Sexplib0.Sexp_conv.sexp_of_int (just 99)
         ]
     in
     let v = Hegel.draw tc gen in

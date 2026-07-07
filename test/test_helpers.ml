@@ -4,64 +4,56 @@
     environment. Uses the POSIX [unsetenv(3)] function via a C stub. *)
 external unsetenv : string -> unit = "caml_unsetenv"
 
-open! Core
-module Unix = Core_unix
+(** [mkdtemp prefix] creates a fresh temporary directory (mode 0700) under the
+    system temp directory (honoring [TMPDIR]) with a name starting with
+    [prefix], and returns its path. There is no [Unix.mkdtemp] in the stdlib;
+    [Filename.temp_dir] provides the same create-and-return-a-unique-path
+    behavior. *)
+let mkdtemp prefix = Stdlib.Filename.temp_dir prefix ""
 
-(** [with_tempdir ~prefix ~f] creates a tempdir via [mkdtemp] under the system
-    temp directory (honoring [TMPDIR]), using [prefix] as the leaf-name prefix.
-    It passes the tempdir's path to [f], and removes the directory (and any
-    flat files inside it) on exit — including on exception. Intended for tests
-    whose tempdirs only contain top-level files; subdirectories are not
-    recursively removed. *)
+(** [with_tempdir ~prefix ~f] creates a tempdir via {!mkdtemp} under the system
+    temp directory, using [prefix] as the leaf-name prefix. It passes the
+    tempdir's path to [f], and removes the directory (and any flat files
+    inside it) on exit — including on exception. Intended for tests whose
+    tempdirs only contain top-level files; subdirectories are not recursively
+    removed. *)
 let with_tempdir ~prefix ~f =
-  let dir =
-    Core_unix.mkdtemp (Filename.concat (Stdlib.Filename.get_temp_dir_name ()) prefix)
-  in
-  Exn.protect
+  let dir = mkdtemp prefix in
+  Stdlib.Fun.protect
     ~finally:(fun () ->
       (try
          Stdlib.Sys.readdir dir
-         |> Array.iter ~f:(fun name ->
-           try Stdlib.Sys.remove (Filename.concat dir name) with
+         |> Array.iter (fun name ->
+           try Stdlib.Sys.remove (Stdlib.Filename.concat dir name) with
            | _ -> ())
        with
        | _ -> ());
-      try Core_unix.rmdir dir with
+      try Unix.rmdir dir with
       | _ -> ())
-    ~f:(fun () -> f dir)
+    (fun () -> f dir)
 ;;
+
+(** [read_all path] reads the entire contents of the file at [path]. *)
+let read_all path = In_channel.with_open_bin path In_channel.input_all
 
 (** [contains_substring s sub] returns [true] if [sub] appears anywhere in [s].
 *)
-let contains_substring s sub =
-  let slen = String.length s
-  and sublen = String.length sub in
-  if sublen > slen
-  then false
-  else (
-    let rec check i =
-      if i > slen - sublen
-      then false
-      else if String.equal (String.sub s ~pos:i ~len:sublen) sub
-      then true
-      else check (i + 1)
-    in
-    check 0)
-;;
+let contains_substring s sub = Astring.String.is_infix ~affix:sub s
+
+(** [split_lines s] splits [s] on ['\n'], dropping empty elements (so a jsonl
+    file with [n] lines each terminated by ['\n'] yields exactly [n] elements).
+*)
+let split_lines s = Astring.String.cuts ~empty:false ~sep:"\n" s
 
 (** Helper: check where a given command is *)
 let find_cmd cmd =
-  let inp_stream = Core_unix.open_process_in ("which " ^ cmd) in
-  let output = String.strip (In_channel.input_all inp_stream) in
-  let exit_code = Core_unix.close_process_in inp_stream in
-  match exit_code with
-  | Ok () -> output
-  | Error err ->
-    raise
-      (Failure
-         (sprintf
-            "Command failed with status: %s"
-            (match err with
-             | `Exit_non_zero code -> Int.to_string code
-             | `Signal signal -> "signaled: " ^ Signal.to_string signal)))
+  let inp_stream = Unix.open_process_in ("which " ^ cmd) in
+  let output = Astring.String.trim (In_channel.input_all inp_stream) in
+  let status = Unix.close_process_in inp_stream in
+  match status with
+  | Unix.WEXITED 0 -> output
+  | Unix.WEXITED code ->
+    raise (Failure (Printf.sprintf "Command failed with status: %d" code))
+  | Unix.WSIGNALED signal | Unix.WSTOPPED signal ->
+    raise (Failure (Printf.sprintf "Command failed with signal: %d" signal))
 ;;

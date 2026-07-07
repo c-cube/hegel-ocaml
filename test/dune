@@ -17,13 +17,14 @@
   test_antithesis
   test_loader)
  (libraries
+  astring
   hegel
   hegel_ffi
   alcotest
-  core
-  core_unix
-  ipaddr
+  sexplib
+  sexplib0
   threads.posix
+  unix
   yojson)
  (preprocess
   (pps ppx_js_style -- -allow-unannotated-ignores))

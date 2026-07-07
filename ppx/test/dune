@@ -8,7 +8,7 @@
  (name test_ppx_derive)
  (package ppx_hegel_generator)
  (modules test_ppx_derive)
- (libraries hegel hegel.test_runtime alcotest core core_unix threads.posix)
+ (libraries hegel hegel.test_runtime alcotest threads.posix)
  (preprocess
   (pps
    ppx_js_style
@@ -21,7 +21,7 @@
  (name test_ppx_hegel_test)
  (package ppx_hegel_test)
  (modules test_ppx_hegel_test)
- (libraries hegel alcotest core core_unix threads.posix yojson)
+ (libraries astring hegel alcotest threads.posix unix yojson)
  (preprocess
   (pps ppx_js_style ppx_hegel_test -- -allow-unannotated-ignores)))
 

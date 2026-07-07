@@ -31,7 +31,7 @@ let%hegel_test test_list_min_size tc =
 let%hegel_test test_map_combinator tc =
   let abs_gen =
     with_printer
-      (fun i -> Core.Sexp.Atom (string_of_int i))
+      (fun i -> Sexplib0.Sexp.Atom (string_of_int i))
       (map (fun v -> abs v) (integers ~min_value:(-100) ~max_value:100 ()))
   in
   let lst = Hegel.draw tc (lists abs_gen ~min_size:1 ~max_size:10 ()) in
@@ -64,7 +64,7 @@ let%hegel_test test_sampled_from tc =
   let v =
     Hegel.draw
       tc
-      (with_printer (fun i -> Core.Sexp.Atom (string_of_int i)) (sampled_from options))
+      (with_printer (fun i -> Sexplib0.Sexp.Atom (string_of_int i)) (sampled_from options))
   in
   assert (v = 10 || v = 20 || v = 30 || v = 40)
 [@@settings Hegel.settings ~test_cases:100 ()]

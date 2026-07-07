@@ -159,7 +159,7 @@ let test_discardable_group_e2e () =
 (** [printer gen] renders [value] to [expected]. ([gen] is printable, so its
     printer is total — no [option].) *)
 let check_printer name gen value expected =
-  Alcotest.(check string) name expected (Core.Sexp.to_string (printer gen value))
+  Alcotest.(check string) name expected (Sexplib.Sexp.to_string (printer gen value))
 ;;
 
 let test_printer_int () = check_printer "int" (integers ()) 42 "42"
@@ -176,7 +176,7 @@ let test_printer_filter_delegates () =
 let test_with_printer () =
   check_printer
     "with_printer"
-    (with_printer Core.Int.sexp_of_t (map (fun v -> v * 2) (integers ())))
+    (with_printer Sexplib0.Sexp_conv.sexp_of_int (map (fun v -> v * 2) (integers ())))
     21
     "21"
 ;;
@@ -264,7 +264,7 @@ let test_printer_one_of_composite () =
 let test_printer_assoc_list_basic () =
   check_printer
     "association list"
-    (assoc_lists (integers ()) (integers ()) ())
+    (hashmaps (integers ()) (integers ()) ())
     [ 1, 2; 3, 4 ]
     "((1 2)(3 4))"
 ;;
@@ -272,7 +272,7 @@ let test_printer_assoc_list_basic () =
 let test_printer_assoc_list_composite () =
   check_printer
     "association list composite"
-    (assoc_lists (filter (fun _ -> true) (integers ())) (integers ()) ())
+    (hashmaps (filter (fun _ -> true) (integers ())) (integers ()) ())
     [ 1, 2 ]
     "((1 2))"
 ;;
@@ -308,19 +308,28 @@ let test_printer_optional_composite () =
     "(7)"
 ;;
 
+module Int_table = Hashtbl.Make (struct
+    type t = int
+
+    let equal = Int.equal
+    let hash = Hashtbl.hash
+  end)
+
+module Pool_gen = Make_pool (Int_table)
+
 let test_resolve_draw () =
-  let tbl = Core.Hashtbl.create (module Core.Int) in
-  Core.Hashtbl.set tbl ~key:7 ~data:"v";
+  let tbl = Int_table.create 16 in
+  Int_table.replace tbl 7 "v";
   (* consume:false keeps the entry *)
-  Alcotest.(check string) "draw" "v" (resolve_draw tbl ~consume:false 7);
-  Alcotest.(check int) "still present" 1 (Core.Hashtbl.length tbl);
+  Alcotest.(check string) "draw" "v" (Pool_gen.resolve_draw tbl ~consume:false 7);
+  Alcotest.(check int) "still present" 1 (Int_table.length tbl);
   (* consume:true removes it *)
-  Alcotest.(check string) "consume" "v" (resolve_draw tbl ~consume:true 7);
-  Alcotest.(check int) "removed" 0 (Core.Hashtbl.length tbl);
+  Alcotest.(check string) "consume" "v" (Pool_gen.resolve_draw tbl ~consume:true 7);
+  Alcotest.(check int) "removed" 0 (Int_table.length tbl);
   (* unknown id raises Flaky_strategy *)
   let raised =
     try
-      ignore (resolve_draw tbl ~consume:false 99 : string);
+      ignore (Pool_gen.resolve_draw tbl ~consume:false 99 : string);
       false
     with
     | Internal.Flaky_strategy -> true

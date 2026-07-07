@@ -198,11 +198,10 @@ hegel_generator]`. Either draw it with `draw_silent` (which prints nothing):
 ```ocaml
 let parity = draw_silent tc (map (fun n -> n mod 2) (integers ()))
 ```
-or attach a printer with `with_printer`. The printer is any `'a -> Sexp.t`. 
-Note that `Sexp` requires `open Core`.
+or attach a printer with `with_printer`. The printer is any `'a -> Sexplib0.Sexp.t`.
 ```ocaml
 let parity =
-  draw tc (with_printer (fun n -> Sexp.Atom (Int.to_string n))
+  draw tc (with_printer (fun n -> Sexplib0.Sexp.Atom (string_of_int n))
              (map (fun n -> n mod 2) (integers ())))
 ```
 If you have [`ppx_sexp_conv`](https://github.com/janestreet/ppx_sexp_conv) in your

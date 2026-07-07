@@ -260,6 +260,19 @@ val generate_text
   -> exclude_characters:string option
   -> string
 
+(** [generate_character tc ...] draws a single character (as a 1-character
+    UTF-8 string). *)
+val generate_character
+  :  test_case
+  -> codec:string option
+  -> min_codepoint:int
+  -> max_codepoint:int
+  -> categories:string list option
+  -> exclude_categories:string list option
+  -> include_characters:string option
+  -> exclude_characters:string option
+  -> string
+
 (** [generate_regex tc ~pattern ~fullmatch] draws a string matching [pattern]
     (Python-[re] syntax). Raises {!Data_exhausted} on StopTest. *)
 val generate_regex : test_case -> pattern:string -> fullmatch:bool -> string
@@ -319,7 +332,7 @@ val stderr_color : string -> string -> string
 
 (** [render_diff ~colored ~original ~updated] renders a structural sexp diff of
     the two values: red/green markings when [colored], [-]/[+] otherwise. *)
-val render_diff : colored:bool -> original:Core.Sexp.t -> updated:Core.Sexp.t -> string
+val render_diff : colored:bool -> original:Sexplib.Sexp.t -> updated:Sexplib.Sexp.t -> string
 
 (**/**)
 
@@ -333,7 +346,7 @@ val require : test_case -> ?msg:string -> bool -> unit
     the two values render to different sexps under [sexp_of], printing a
     structural sexp diff of the two values in the failure report's body before
     raising [Failure msg]. *)
-val require_equal : test_case -> ?msg:string -> ('a -> Core.Sexp.t) -> 'a -> 'a -> unit
+val require_equal : test_case -> ?msg:string -> ('a -> Sexplib.Sexp.t) -> 'a -> 'a -> unit
 
 (**/**)
 

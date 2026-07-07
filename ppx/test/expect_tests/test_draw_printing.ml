@@ -6,7 +6,9 @@
     user code ([map], [sampled_from]) carry none, and [with_printer] attaches
     one (and is what [draw] requires). *)
 
-open! Core
+module Sexp = Sexplib0.Sexp
+
+open Sexplib0.Sexp_conv
 open Hegel
 open Generators
 
@@ -27,7 +29,7 @@ let%expect_test "draw_silent returns the value and prints nothing" =
     ~settings:(settings ~test_cases:1 () |> with_verbosity Normal)
     (fun tc ->
        let v = Hegel.draw_silent tc (integers ~min_value:3 ~max_value:3 ()) in
-       printf "got=%d" v);
+       Printf.printf "got=%d" v);
   [%expect {| got=3 |}]
 ;;
 
@@ -88,7 +90,7 @@ let%expect_test "with_printer supplies the printer draw renders with" =
         ~label:"h"
         tc
         (with_printer
-           (fun n -> Sexp.Atom (sprintf "0x%x" n))
+           (fun n -> Sexp.Atom (Printf.sprintf "0x%x" n))
            (integers ~min_value:255 ~max_value:255 ()))
     in
     assert false);
@@ -106,7 +108,7 @@ let%expect_test "with_printer supplies the printer draw renders with" =
 
 let%expect_test "with_printer makes an unprintable sampled_from drawable" =
   run_failing (fun tc ->
-    let _ = Hegel.draw ~label:"c" tc (with_printer Int.sexp_of_t (sampled_from [ 9 ])) in
+    let _ = Hegel.draw ~label:"c" tc (with_printer sexp_of_int (sampled_from [ 9 ])) in
     assert false);
   [%expect
     {|

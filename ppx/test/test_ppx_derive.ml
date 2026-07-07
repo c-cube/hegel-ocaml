@@ -8,8 +8,6 @@
     - Nested derived types
     - Variants with tuple arguments *)
 
-open! Core
-
 (* ==== Type declarations with derived generators ==== *)
 
 (** A record with two primitive fields. *)

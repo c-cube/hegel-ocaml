@@ -613,7 +613,7 @@ val require : test_case -> ?msg:string -> bool -> unit
           (List.sort compare l)
           (stable_sort l)
     ]} *)
-val require_equal : test_case -> ?msg:string -> ('a -> Core.Sexp.t) -> 'a -> 'a -> unit
+val require_equal : test_case -> ?msg:string -> ('a -> Sexplib.Sexp.t) -> 'a -> 'a -> unit
 
 (** [with_printer sexp_of gen] attaches (or replaces) [gen]'s printer, yielding a
     printable generator that {!draw} accepts. This is how a
@@ -622,11 +622,11 @@ val require_equal : test_case -> ?msg:string -> ('a -> Core.Sexp.t) -> 'a -> 'a 
     {[
       let%hegel_test with_printer_example tc =
         let doubled = map (fun x -> x * 2) (integers ~min_value:0 ~max_value:9 ()) in
-        let n = draw tc (with_printer Core.Int.sexp_of_t doubled) in
+        let n = draw tc (with_printer Sexplib0.Sexp_conv.sexp_of_int doubled) in
         assert (n >= 0)
     ]} *)
 val with_printer
-  :  ('a -> Core.Sexp.t)
+  :  ('a -> Sexplib0.Sexp.t)
   -> ('a, 'p) Generators.generator
   -> ('a, Generators.printable) Generators.generator
 

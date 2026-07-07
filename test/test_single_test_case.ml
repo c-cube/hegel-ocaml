@@ -1,4 +1,3 @@
-open! Core
 open Hegel
 module G = Hegel.Generators
 
@@ -11,8 +10,8 @@ let test_runs_exactly_one_case () =
       Hegel.draw
         tc
         (G.integers
-           ~min_value:Int32.(to_int_exn min_value)
-           ~max_value:Int32.(to_int_exn max_value)
+           ~min_value:(Int32.to_int Int32.min_int)
+           ~max_value:(Int32.to_int Int32.max_int)
            ())
     in
     incr count);
@@ -31,11 +30,11 @@ let test_failing_propagates () =
      Hegel.run_hegel_test ~settings:(single_settings ()) (fun _tc ->
        failwith "deliberate failure")
    with
-   | e -> raised_msg := Exn.to_string e);
+   | e -> raised_msg := Printexc.to_string e);
   Alcotest.(check bool)
     "exception carries the original message"
     true
-    (String.is_substring !raised_msg ~substring:"deliberate failure")
+    (Test_helpers.contains_substring !raised_msg "deliberate failure")
 ;;
 
 let test_no_shrinking () =
@@ -47,8 +46,8 @@ let test_no_shrinking () =
          Hegel.draw
            tc
            (G.integers
-              ~min_value:Int32.(to_int_exn min_value)
-              ~max_value:Int32.(to_int_exn max_value)
+              ~min_value:(Int32.to_int Int32.min_int)
+              ~max_value:(Int32.to_int Int32.max_int)
               ())
        in
        incr count;
@@ -70,8 +69,8 @@ let test_with_seed_is_deterministic () =
          := Hegel.draw
               tc
               (G.integers
-                 ~min_value:Int32.(to_int_exn min_value)
-                 ~max_value:Int32.(to_int_exn max_value)
+                 ~min_value:(Int32.to_int Int32.min_int)
+                 ~max_value:(Int32.to_int Int32.max_int)
                  ()));
     values := !value :: !values
   done;
@@ -95,8 +94,8 @@ let test_generation_works () =
         tc
         (G.lists
            (G.integers
-              ~min_value:Int32.(to_int_exn min_value)
-              ~max_value:Int32.(to_int_exn max_value)
+              ~min_value:(Int32.to_int Int32.min_int)
+              ~max_value:(Int32.to_int Int32.max_int)
               ())
            ())
     in
@@ -126,11 +125,11 @@ let test_stateful_single_mode_unbounded_steps () =
      Hegel.run_hegel_test ~settings:(single_settings ()) (fun tc ->
        S.run ~init:() ~rules:[ step_rule ] tc)
    with
-   | e -> raised_msg := Exn.to_string e);
+   | e -> raised_msg := Printexc.to_string e);
   Alcotest.(check bool)
     "exception carries the original message"
     true
-    (String.is_substring !raised_msg ~substring:"reached 200 steps");
+    (Test_helpers.contains_substring !raised_msg "reached 200 steps");
   Alcotest.(check int) "ran exactly 200 steps" 200 !step_count
 ;;
 

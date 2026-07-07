@@ -24,23 +24,23 @@ let test_lists_min_greater_than_max () =
   | _ -> Alcotest.fail "expected Invalid_argument"
 ;;
 
-(** Test: assoc_lists raises when min_size is negative. *)
+(** Test: hashmaps raises when min_size is negative. *)
 let test_assoc_lists_negative_min_size () =
-  match assoc_lists (integers ()) (booleans ()) ~min_size:(-1) () with
+  match hashmaps (integers ()) (booleans ()) ~min_size:(-1) () with
   | exception Invalid_argument _ -> ()
   | _ -> Alcotest.fail "expected Invalid_argument"
 ;;
 
-(** Test: assoc_lists raises when max_size is negative. *)
+(** Test: hashmaps raises when max_size is negative. *)
 let test_assoc_lists_negative_max_size () =
-  match assoc_lists (integers ()) (booleans ()) ~max_size:(-1) () with
+  match hashmaps (integers ()) (booleans ()) ~max_size:(-1) () with
   | exception Invalid_argument _ -> ()
   | _ -> Alcotest.fail "expected Invalid_argument"
 ;;
 
-(** Test: assoc_lists raises when min_size > max_size. *)
+(** Test: hashmaps raises when min_size > max_size. *)
 let test_assoc_lists_min_greater_than_max () =
-  match assoc_lists (integers ()) (booleans ()) ~min_size:5 ~max_size:3 () with
+  match hashmaps (integers ()) (booleans ()) ~min_size:5 ~max_size:3 () with
   | exception Invalid_argument _ -> ()
   | _ -> Alcotest.fail "expected Invalid_argument"
 ;;
@@ -142,22 +142,22 @@ let test_lists_non_basic_unique_exhaustion_e2e () =
        ignore (Hegel.draw tc gen))
 ;;
 
-(** Test: assoc_lists(non-basic keys) E2E — generates pairs. *)
+(** Test: hashmaps(non-basic keys) E2E — generates pairs. *)
 let test_assoc_lists_non_basic_keys_e2e () =
   Hegel.run_hegel_test ~settings:(Hegel.settings ~test_cases:10 ()) (fun tc ->
     let key_gen = filter (fun _ -> true) (integers ~min_value:0 ~max_value:100 ()) in
     let val_gen = integers ~min_value:0 ~max_value:100 () in
-    let gen = assoc_lists key_gen val_gen ~min_size:0 ~max_size:5 () in
+    let gen = hashmaps key_gen val_gen ~min_size:0 ~max_size:5 () in
     let pairs = Hegel.draw tc gen in
     assert (List.length pairs <= 5))
 ;;
 
-(** Test: assoc_lists(non-basic values) E2E — generates pairs. *)
+(** Test: hashmaps(non-basic values) E2E — generates pairs. *)
 let test_assoc_lists_non_basic_values_e2e () =
   Hegel.run_hegel_test ~settings:(Hegel.settings ~test_cases:10 ()) (fun tc ->
     let key_gen = integers ~min_value:0 ~max_value:100 () in
     let val_gen = filter (fun _ -> true) (integers ~min_value:0 ~max_value:100 ()) in
-    let gen = assoc_lists key_gen val_gen ~min_size:0 ~max_size:5 () in
+    let gen = hashmaps key_gen val_gen ~min_size:0 ~max_size:5 () in
     let pairs = Hegel.draw tc gen in
     assert (List.length pairs <= 5))
 ;;
@@ -176,7 +176,7 @@ let test_lists_unique_under_map_e2e () =
        let gen =
          lists
            (with_printer
-              Core.Int.sexp_of_t
+              Sexplib0.Sexp_conv.sexp_of_int
               (map (fun _ -> 0) (integers ~min_value:0 ~max_value:1 ())))
            ~min_size:2
            ~max_size:2
@@ -207,14 +207,14 @@ let test_hash_tables_e2e () =
     Core.Hashtbl.iteri table ~f:(fun ~key ~data:_ -> assert (key >= 0 && key <= 100)))
 ;;
 
-(** Test: hash_tables rejects crossed size bounds like assoc_lists. *)
+(** Test: hash_tables rejects crossed size bounds like hashmaps. *)
 let test_hash_tables_min_greater_than_max () =
   match hash_tables (integers ()) (booleans ()) ~min_size:5 ~max_size:3 () with
   | exception Invalid_argument _ -> ()
   | _ -> Alcotest.fail "expected Invalid_argument"
 ;;
 
-(** Regression: [assoc_lists] with a non-basic key generator must still enforce
+(** Regression: [hashmaps] with a non-basic key generator must still enforce
     key uniqueness. With keys constrained to a single value, the dedup loop
     rejects every duplicate; the engine's reject limit eventually fires
     StopTest, which is caught by the test runner and skips the case.*)
@@ -224,7 +224,7 @@ let test_assoc_lists_unique_keys_under_filter_e2e () =
       (Hegel.settings ~test_cases:5 () |> with_suppress_health_check [ Filter_too_much ])
     (fun tc ->
        let gen =
-         assoc_lists
+         hashmaps
            (filter (fun _ -> true) (integers ~min_value:0 ~max_value:0 ()))
            (booleans ())
            ~min_size:2
@@ -242,15 +242,15 @@ let tests =
   ; Alcotest.test_case "lists negative max_size" `Quick test_lists_negative_max_size
   ; Alcotest.test_case "lists min > max" `Quick test_lists_min_greater_than_max
   ; Alcotest.test_case
-      "assoc_lists negative min_size"
+      "hashmaps negative min_size"
       `Quick
       test_assoc_lists_negative_min_size
   ; Alcotest.test_case
-      "assoc_lists negative max_size"
+      "hashmaps negative max_size"
       `Quick
       test_assoc_lists_negative_max_size
   ; Alcotest.test_case
-      "assoc_lists min > max"
+      "hashmaps min > max"
       `Quick
       test_assoc_lists_min_greater_than_max
   ; Alcotest.test_case "lists of integers e2e" `Quick test_lists_of_integers_e2e
@@ -270,11 +270,11 @@ let tests =
       `Quick
       test_hash_tables_min_greater_than_max
   ; Alcotest.test_case
-      "assoc_lists non-basic keys e2e"
+      "hashmaps non-basic keys e2e"
       `Quick
       test_assoc_lists_non_basic_keys_e2e
   ; Alcotest.test_case
-      "assoc_lists non-basic values e2e"
+      "hashmaps non-basic values e2e"
       `Quick
       test_assoc_lists_non_basic_values_e2e
   ; Alcotest.test_case
@@ -282,7 +282,7 @@ let tests =
       `Quick
       test_lists_unique_under_map_e2e
   ; Alcotest.test_case
-      "assoc_lists unique keys under filter e2e (regression)"
+      "hashmaps unique keys under filter e2e (regression)"
       `Quick
       test_assoc_lists_unique_keys_under_filter_e2e
   ]

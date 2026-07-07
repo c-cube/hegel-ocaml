@@ -171,6 +171,6 @@ val run
   :  init:'state
   -> rules:'state Rule.t list
   -> ?invariants:('state -> unit) list
-  -> ?sexp_of_state:('state -> Core.Sexp.t)
+  -> ?sexp_of_state:('state -> Sexplib.Sexp.t)
   -> Internal.test_case
   -> unit

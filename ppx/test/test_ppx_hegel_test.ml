@@ -3,38 +3,44 @@
     These tests exercise the full expansion of [let%hegel_test] including
     the [@@settings ...] attribute. *)
 
-open! Core
-
 let env_var = "ANTITHESIS_OUTPUT_DIR"
 
 let with_env_dir dir ~f =
-  let prev = Sys.getenv env_var in
-  Core_unix.putenv ~key:env_var ~data:dir;
-  Exn.protect
+  let prev = Stdlib.Sys.getenv_opt env_var in
+  Unix.putenv env_var dir;
+  Stdlib.Fun.protect
     ~finally:(fun () ->
       match prev with
-      | Some v -> Core_unix.putenv ~key:env_var ~data:v
-      | None -> Core_unix.putenv ~key:env_var ~data:"")
-    ~f
+      | Some v -> Unix.putenv env_var v
+      | None -> Unix.putenv env_var "")
+    f
 ;;
 
 let with_tempdir ~f =
-  let dir =
-    Core_unix.mkdtemp
-      (Filename.concat (Stdlib.Filename.get_temp_dir_name ()) "hegel-ppx-test-")
-  in
-  Exn.protect
+  let dir = Stdlib.Filename.temp_dir "hegel-ppx-test-" "" in
+  Stdlib.Fun.protect
     ~finally:(fun () ->
       (try
          Stdlib.Sys.readdir dir
-         |> Array.iter ~f:(fun name ->
-           try Stdlib.Sys.remove (Filename.concat dir name) with
+         |> Array.iter (fun name ->
+           try Stdlib.Sys.remove (Stdlib.Filename.concat dir name) with
            | _ -> ())
        with
        | _ -> ());
-      try Core_unix.rmdir dir with
+      try Unix.rmdir dir with
       | _ -> ())
-    ~f:(fun () -> f dir)
+    (fun () -> f dir)
+;;
+
+(** [read_all path] reads the entire contents of the file at [path]. *)
+let read_all path = In_channel.with_open_bin path In_channel.input_all
+
+(** [assoc_find_exn key assoc] looks up [key] in the association list
+    [assoc], raising if absent. *)
+let assoc_find_exn key assoc =
+  match List.find_opt (fun (k, _) -> String.equal k key) assoc with
+  | Some (_, v) -> v
+  | None -> failwith (Printf.sprintf "key %s not found" key)
 ;;
 
 (** A simple passing test, expected to expand into a unit -> unit wrapper. *)
@@ -62,12 +68,15 @@ let test_passing_writes_sdk_jsonl () =
   with_tempdir ~f:(fun dir ->
     with_env_dir dir ~f:(fun () ->
       simple_pass ();
-      let path = Filename.concat dir "sdk.jsonl" in
+      let path = Stdlib.Filename.concat dir "sdk.jsonl" in
       Alcotest.(check bool) "sdk.jsonl exists" true (Stdlib.Sys.file_exists path);
-      let lines = In_channel.read_all path |> String.split_lines in
+      let lines =
+        read_all path
+        |> Astring.String.cuts ~empty:false ~sep:"\n"
+      in
       Alcotest.(check int) "two lines (declaration + evaluation)" 2 (List.length lines);
-      let decl = Yojson.Safe.from_string (List.nth_exn lines 0) in
-      let eval = Yojson.Safe.from_string (List.nth_exn lines 1) in
+      let decl = Yojson.Safe.from_string (List.nth lines 0) in
+      let eval = Yojson.Safe.from_string (List.nth lines 1) in
       let decl_assoc =
         match decl with
         | `Assoc [ ("antithesis_assert", `Assoc fields) ] -> fields
@@ -81,37 +90,32 @@ let test_passing_writes_sdk_jsonl () =
       Alcotest.(check string)
         "declaration hit"
         "false"
-        (Yojson.Safe.to_string (List.Assoc.find_exn decl_assoc ~equal:String.equal "hit"));
+        (Yojson.Safe.to_string (assoc_find_exn "hit" decl_assoc));
       Alcotest.(check string)
         "evaluation hit"
         "true"
-        (Yojson.Safe.to_string (List.Assoc.find_exn eval_assoc ~equal:String.equal "hit"));
+        (Yojson.Safe.to_string (assoc_find_exn "hit" eval_assoc));
       Alcotest.(check string)
         "evaluation condition is true (passing test)"
         "true"
-        (Yojson.Safe.to_string
-           (List.Assoc.find_exn eval_assoc ~equal:String.equal "condition"));
-      let id =
-        Yojson.Safe.to_string (List.Assoc.find_exn eval_assoc ~equal:String.equal "id")
-      in
+        (Yojson.Safe.to_string (assoc_find_exn "condition" eval_assoc));
+      let id = Yojson.Safe.to_string (assoc_find_exn "id" eval_assoc) in
       Alcotest.(check bool)
         "id mentions test_ppx_hegel_test"
         true
-        (String.is_substring id ~substring:"simple_pass in test_ppx_hegel_test");
+        (Astring.String.is_infix ~affix:"simple_pass in test_ppx_hegel_test" id);
       (* location.file should mention the test file. *)
-      let loc = List.Assoc.find_exn eval_assoc ~equal:String.equal "location" in
+      let loc = assoc_find_exn "location" eval_assoc in
       let loc_assoc =
         match loc with
         | `Assoc f -> f
         | _ -> Alcotest.fail "location not an object"
       in
-      let file =
-        Yojson.Safe.to_string (List.Assoc.find_exn loc_assoc ~equal:String.equal "file")
-      in
+      let file = Yojson.Safe.to_string (assoc_find_exn "file" loc_assoc) in
       Alcotest.(check bool)
         "location.file mentions test_ppx_hegel_test.ml"
         true
-        (String.is_substring file ~substring:"test_ppx_hegel_test.ml")))
+        (Astring.String.is_infix ~affix:"test_ppx_hegel_test.ml" file)))
 ;;
 
 let test_failing_writes_condition_false () =
@@ -119,10 +123,13 @@ let test_failing_writes_condition_false () =
     with_env_dir dir ~f:(fun () ->
       (try simple_fail () with
        | _ -> ());
-      let path = Filename.concat dir "sdk.jsonl" in
+      let path = Stdlib.Filename.concat dir "sdk.jsonl" in
       Alcotest.(check bool) "sdk.jsonl exists" true (Stdlib.Sys.file_exists path);
-      let lines = In_channel.read_all path |> String.split_lines in
-      let eval = Yojson.Safe.from_string (List.nth_exn lines 1) in
+      let lines =
+        read_all path
+        |> Astring.String.cuts ~empty:false ~sep:"\n"
+      in
+      let eval = Yojson.Safe.from_string (List.nth lines 1) in
       let eval_assoc =
         match eval with
         | `Assoc [ ("antithesis_assert", `Assoc fields) ] -> fields
@@ -131,15 +138,14 @@ let test_failing_writes_condition_false () =
       Alcotest.(check string)
         "evaluation condition is false (failing test)"
         "false"
-        (Yojson.Safe.to_string
-           (List.Assoc.find_exn eval_assoc ~equal:String.equal "condition"))))
+        (Yojson.Safe.to_string (assoc_find_exn "condition" eval_assoc))))
 ;;
 
 let test_no_settings_runs_with_defaults () =
   with_tempdir ~f:(fun dir ->
     with_env_dir dir ~f:(fun () ->
       no_settings ();
-      let path = Filename.concat dir "sdk.jsonl" in
+      let path = Stdlib.Filename.concat dir "sdk.jsonl" in
       Alcotest.(check bool) "sdk.jsonl exists" true (Stdlib.Sys.file_exists path)))
 ;;
 
