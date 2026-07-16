@@ -36,12 +36,8 @@ let with_tempdir ~f =
 let read_all path = In_channel.with_open_bin path In_channel.input_all
 
 (** [assoc_find_exn key assoc] looks up [key] in the association list
-    [assoc], raising if absent. *)
-let assoc_find_exn key assoc =
-  match List.find_opt (fun (k, _) -> String.equal k key) assoc with
-  | Some (_, v) -> v
-  | None -> failwith (Printf.sprintf "key %s not found" key)
-;;
+    [assoc], raising [Not_found] if absent. *)
+let assoc_find_exn = List.assoc
 
 (** A simple passing test, expected to expand into a unit -> unit wrapper. *)
 let%hegel_test simple_pass (tc : Hegel.test_case) =

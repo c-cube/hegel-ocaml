@@ -1,0 +1,6 @@
+(library
+ (name hegel_core)
+ (public_name hegel.core)
+ (optional)
+ (wrapped false)
+ (libraries hegel core))

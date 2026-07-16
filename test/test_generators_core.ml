@@ -308,13 +308,6 @@ let test_printer_optional_composite () =
     "(7)"
 ;;
 
-module Int_table = Hashtbl.Make (struct
-    type t = int
-
-    let equal = Int.equal
-    let hash = Hashtbl.hash
-  end)
-
 module Pool_gen = Make_pool (Int_table)
 
 let test_resolve_draw () =
